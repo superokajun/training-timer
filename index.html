@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="筋トレ">
+<meta name="theme-color" content="#0b0d10">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>筋トレタイマー</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{
+  background:#0b0d10;color:#fff;
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+  -webkit-user-select:none;user-select:none;overscroll-behavior:none;
+}
+#app{
+  height:100%;display:flex;flex-direction:column;align-items:center;
+  padding:calc(env(safe-area-inset-top) + 22px) 20px calc(env(safe-area-inset-bottom) + 18px);
+}
+.title{font-size:35px;font-weight:600;letter-spacing:.06em;margin-bottom:26px}
+
+/* 4つの円を2行2列に */
+.grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:20px;
+  width:100%;max-width:420px;margin:auto 0;
+}
+.t{
+  position:relative;aspect-ratio:1;border:0;padding:0;background:transparent;color:#fff;
+  font-family:inherit;cursor:pointer;touch-action:manipulation;-webkit-touch-callout:none;
+}
+.t:active{transform:scale(.97)}
+.t svg{width:100%;height:100%;display:block}
+.t .track{fill:#1b2029}
+.t .pie{fill:#ff6b35}
+.t .hand{stroke:#fff;stroke-width:2.5;stroke-linecap:round;display:none}
+.t .dot{fill:#fff;display:none}
+.t.on .hand,.t.on .dot{display:block}
+.t .time{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:40px;font-weight:300;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum";
+  text-shadow:0 1px 8px rgba(0,0,0,.55);pointer-events:none;
+}
+
+#toast{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(env(safe-area-inset-bottom) + 30px);
+  background:#232932;color:#fff;font-size:13px;padding:12px 22px;border-radius:999px;
+  opacity:0;transition:opacity .25s;pointer-events:none;max-width:86vw;text-align:center;
+}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="title">筋トレタイマー</div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+/* ==================== タイマー ====================
+   1分・2分・3分・5分の円を並べる。
+   ・円をタップで開始。動いている円をもう一度タップで停止して満タンに戻る
+   ・同時に動くのは1つだけ。別の円をタップしたら、そちらに切り替わる
+   ・残り5秒から 5 4 3 2 1、0で「終了」を読み上げ、円は満タンに戻る
+==================================================== */
+const TIMES = [60, 120, 180, 300];
+
+function fmt(sec){ const m = Math.floor(sec / 60), s = sec % 60; return m + ':' + (s < 10 ? '0' : '') + s; }
+
+/* 残りの割合 f だけ塗る扇形。12時から時計回りに欠けていき、残りは12時で終わる */
+function wedge(f){
+  if(f >= 1) return 'M50,0 A50,50 0 1 1 49.999,0 Z';
+  if(f <= 0) return '';
+  const a = 2 * Math.PI * (1 - f);
+  const x = 50 + 50 * Math.sin(a), y = 50 - 50 * Math.cos(a);
+  return `M50,50 L${x.toFixed(3)},${y.toFixed(3)} A50,50 0 ${f > 0.5 ? 1 : 0} 1 50,0 Z`;
+}
+function handEnd(f){
+  const a = 2 * Math.PI * (1 - f);
+  return {x: 50 + 50 * Math.sin(a), y: 50 - 50 * Math.cos(a)};
+}
+
+const grid = $('grid');
+const timers = TIMES.map(sec => {
+  const el = document.createElement('button');
+  el.className = 't'; el.setAttribute('aria-label', fmt(sec) + 'のタイマー');
+  el.innerHTML = `
+    <svg viewBox="0 0 100 100">
+      <circle class="track" cx="50" cy="50" r="50"/>
+      <path class="pie" d="${wedge(1)}"/>
+      <line class="hand" x1="50" y1="50" x2="50" y2="0"/>
+      <circle class="dot" cx="50" cy="50" r="5"/>
+    </svg>
+    <div class="time">${fmt(sec)}</div>`;
+  grid.appendChild(el);
+  const t = {sec, el, pie: el.querySelector('.pie'), hand: el.querySelector('.hand'), time: el.querySelector('.time')};
+  el.addEventListener('click', () => tap(t));
+  el.addEventListener('contextmenu', e => e.preventDefault());
+  return t;
+});
+
+function paint(t, remain){
+  const f = Math.max(0, Math.min(1, remain / t.sec));
+  t.pie.setAttribute('d', wedge(f));
+  const p = handEnd(f);
+  t.hand.setAttribute('x2', p.x.toFixed(3)); t.hand.setAttribute('y2', p.y.toFixed(3));
+  t.time.textContent = fmt(Math.max(0, Math.ceil(remain)));
+}
+function reset(t){
+  t.el.classList.remove('on');
+  paint(t, t.sec);
+}
+
+let active = null, loop = null;
+
+function start(t){
+  active = {t, t0: performance.now(), nextSay: 5};
+  t.el.classList.add('on');
+  paint(t, t.sec);
+  wake();
+  loop = setInterval(tick, 50);
+}
+function stopActive(){
+  if(!active) return;
+  clearInterval(loop); loop = null;
+  reset(active.t);
+  active = null;
+  release();
+}
+function tick(){
+  if(!active) return;
+  const remain = active.t.sec - (performance.now() - active.t0) / 1000;
+  while(active.nextSay >= 1 && remain <= active.nextSay){ speak(String(active.nextSay)); active.nextSay--; }
+  if(remain <= 0){ speak('end'); stopActive(); return; }
+  paint(active.t, remain);
+}
+
+async function tap(t){
+  if(active && active.t === t){ stopActive(); return; }     // 動いている円をもう一度タップ → 止めて満タンに
+  if(!ready){ toast('音声を準備しています…', 1500); return; }
+  if(ctx.state === 'suspended') await ctx.resume();          // iOSはタップ内で起こす必要がある
+  stopActive();
+  start(t);
+}
+
+/* ==================== 読み上げ（録音した音声を鳴らす） ==================== */
+const FILES = ['1','2','3','4','5','end'];
+const buffers = {};
+let ctx = null, ready = false;
+
+async function loadVoices(){
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const missing = [];
+  await Promise.all(FILES.map(async n => {
+    try{
+      const res = await fetch('voice/' + n + '.mp3');
+      if(!res.ok) throw 0;
+      buffers[n] = await ctx.decodeAudioData(await res.arrayBuffer());
+    }catch(e){ missing.push(n); }
+  }));
+  ready = true;
+  if(missing.length) toast('音声がありません: ' + missing.join(', '), 4000);
+}
+loadVoices().catch(() => toast('音声を読み込めませんでした'));
+
+function speak(name){
+  const buf = ctx && buffers[name];
+  if(!buf) return;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  src.start();
+}
+
+/* ==================== 表示 ==================== */
+let toastTimer;
+function toast(msg, ms){
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), ms || 2600);
+}
+
+/* ==================== 画面を消さない ==================== */
+let lock = null;
+async function wake(){
+  try{ if('wakeLock' in navigator && !lock) lock = await navigator.wakeLock.request('screen'); }catch(e){}
+}
+function release(){ try{ if(lock){ lock.release(); lock = null; } }catch(e){} }
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && active) wake();
+});
+
+/* ==================== オフライン ==================== */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
