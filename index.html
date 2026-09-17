@@ -38,9 +38,6 @@ body{
 .t svg{width:100%;height:100%;display:block}
 .t .track{fill:#1b2029}
 .t .pie{fill:#ff6b35}
-.t .hand{stroke:#fff;stroke-width:2.5;stroke-linecap:round;display:none}
-.t .dot{fill:#fff;display:none}
-.t.on .hand,.t.on .dot{display:block}
 .t .time{
   position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-size:40px;font-weight:300;letter-spacing:-.02em;
@@ -86,10 +83,6 @@ function wedge(f){
   const x = 50 + 50 * Math.sin(a), y = 50 - 50 * Math.cos(a);
   return `M50,50 L${x.toFixed(3)},${y.toFixed(3)} A50,50 0 ${f > 0.5 ? 1 : 0} 1 50,0 Z`;
 }
-function handEnd(f){
-  const a = 2 * Math.PI * (1 - f);
-  return {x: 50 + 50 * Math.sin(a), y: 50 - 50 * Math.cos(a)};
-}
 
 const grid = $('grid');
 const timers = TIMES.map(sec => {
@@ -99,12 +92,10 @@ const timers = TIMES.map(sec => {
     <svg viewBox="0 0 100 100">
       <circle class="track" cx="50" cy="50" r="50"/>
       <path class="pie" d="${wedge(1)}"/>
-      <line class="hand" x1="50" y1="50" x2="50" y2="0"/>
-      <circle class="dot" cx="50" cy="50" r="5"/>
     </svg>
     <div class="time">${fmt(sec)}</div>`;
   grid.appendChild(el);
-  const t = {sec, el, pie: el.querySelector('.pie'), hand: el.querySelector('.hand'), time: el.querySelector('.time')};
+  const t = {sec, el, pie: el.querySelector('.pie'), time: el.querySelector('.time')};
   el.addEventListener('click', () => tap(t));
   el.addEventListener('contextmenu', e => e.preventDefault());
   return t;
@@ -113,8 +104,6 @@ const timers = TIMES.map(sec => {
 function paint(t, remain){
   const f = Math.max(0, Math.min(1, remain / t.sec));
   t.pie.setAttribute('d', wedge(f));
-  const p = handEnd(f);
-  t.hand.setAttribute('x2', p.x.toFixed(3)); t.hand.setAttribute('y2', p.y.toFixed(3));
   t.time.textContent = fmt(Math.max(0, Math.ceil(remain)));
 }
 function reset(t){
