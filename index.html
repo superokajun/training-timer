@@ -28,7 +28,7 @@ body{
 /* 4つの円を2行2列に */
 .grid{
   display:grid;grid-template-columns:1fr 1fr;gap:20px;
-  width:100%;max-width:420px;margin:auto 0;
+  width:100%;max-width:420px;margin-top:auto;
 }
 .t{
   position:relative;aspect-ratio:1;border:0;padding:0;background:transparent;color:#fff;
@@ -45,6 +45,16 @@ body{
   text-shadow:0 1px 8px rgba(0,0,0,.55);pointer-events:none;
 }
 
+/* ベンチプレス切り替え。オンなら残り30秒で「リストラップ」を読み上げる */
+.mode{
+  margin:30px 0 auto;height:62px;padding:0 34px;border-radius:999px;
+  border:1.5px solid #3a4250;background:transparent;color:#fff;
+  font-family:inherit;font-size:22px;letter-spacing:.06em;cursor:pointer;
+  touch-action:manipulation;-webkit-touch-callout:none;transition:background .15s,color .15s;
+}
+.mode:active{transform:scale(.97)}
+.mode.on{background:#ff6b35;border-color:#ff6b35;color:#0b0d10;font-weight:600}
+
 #toast{
   position:fixed;left:50%;transform:translateX(-50%);
   bottom:calc(env(safe-area-inset-bottom) + 30px);
@@ -58,6 +68,7 @@ body{
 <div id="app">
   <div class="title">筋トレタイマー</div>
   <div class="grid" id="grid"></div>
+  <button class="mode" id="bench" aria-pressed="false">ベンチプレス</button>
 </div>
 
 <div id="toast"></div>
@@ -69,7 +80,8 @@ const $ = id => document.getElementById(id);
    1分・2分・3分・5分の円を並べる。
    ・円をタップで開始。動いている円をもう一度タップで停止して満タンに戻る
    ・同時に動くのは1つだけ。別の円をタップしたら、そちらに切り替わる
-   ・残り5秒から 5 4 3 2 1、0で「終了」を読み上げ、円は満タンに戻る
+   ・残り5秒から 5 4 3 2 1、0で「スタート」を読み上げ、円は満タンに戻る
+   ・「ベンチプレス」がオンなら、残り30秒で「リストラップ」も読み上げる
 ==================================================== */
 const TIMES = [60, 120, 180, 300];
 
@@ -111,10 +123,16 @@ function reset(t){
   paint(t, t.sec);
 }
 
-let active = null, loop = null;
+let active = null, loop = null, bench = false;
+
+$('bench').addEventListener('click', () => {
+  bench = !bench;
+  $('bench').classList.toggle('on', bench);
+  $('bench').setAttribute('aria-pressed', bench);
+});
 
 function start(t){
-  active = {t, t0: performance.now(), nextSay: 5};
+  active = {t, t0: performance.now(), nextSay: 5, wrapSaid: false};
   t.el.classList.add('on');
   paint(t, t.sec);
   wake();
@@ -130,8 +148,9 @@ function stopActive(){
 function tick(){
   if(!active) return;
   const remain = active.t.sec - (performance.now() - active.t0) / 1000;
+  if(bench && !active.wrapSaid && remain <= 30){ speak('wristwrap'); active.wrapSaid = true; }
   while(active.nextSay >= 1 && remain <= active.nextSay){ speak(String(active.nextSay)); active.nextSay--; }
-  if(remain <= 0){ speak('end'); stopActive(); return; }
+  if(remain <= 0){ speak('start'); stopActive(); return; }
   paint(active.t, remain);
 }
 
@@ -144,7 +163,7 @@ async function tap(t){
 }
 
 /* ==================== 読み上げ（録音した音声を鳴らす） ==================== */
-const FILES = ['1','2','3','4','5','end'];
+const FILES = ['1','2','3','4','5','start','wristwrap'];
 const buffers = {};
 let ctx = null, ready = false;
 
