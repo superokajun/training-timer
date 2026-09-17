@@ -1,5 +1,5 @@
-const CACHE  = 'training-timer-v2';
-const VOICE  = ['1','2','3','4','5','start','wristwrap'].map(n => './voice/' + n + '.mp3');
+const CACHE  = 'training-timer-v3';
+const VOICE  = ['1','2','3','4','5','start','before30','before20','before10'].map(n => './voice/' + n + '.mp3');
 const ASSETS = ['./','./index.html','./manifest.webmanifest','./icon-180.png','./icon-192.png','./icon-512.png'].concat(VOICE);
 
 self.addEventListener('install', e => {
