@@ -45,15 +45,23 @@ body{
   text-shadow:0 1px 8px rgba(0,0,0,.55);pointer-events:none;
 }
 
-/* ベンチプレス切り替え。オンなら残り30秒で「リストラップ」を読み上げる */
+/* ベンチプレス切り替え。iPhoneの設定画面と同じスイッチ。オンなら残り30秒で「リストラップ」を読み上げる */
 .mode{
-  margin:30px 0 auto;height:62px;padding:0 34px;border-radius:999px;
-  border:1.5px solid #3a4250;background:transparent;color:#fff;
-  font-family:inherit;font-size:22px;letter-spacing:.06em;cursor:pointer;
-  touch-action:manipulation;-webkit-touch-callout:none;transition:background .15s,color .15s;
+  margin:30px 0 auto;display:flex;align-items:center;gap:18px;
+  border:0;background:transparent;color:#fff;padding:8px 4px;
+  font-family:inherit;font-size:26px;font-weight:300;letter-spacing:.06em;cursor:pointer;
+  touch-action:manipulation;-webkit-touch-callout:none;
 }
-.mode:active{transform:scale(.97)}
-.mode.on{background:#ff6b35;border-color:#ff6b35;color:#0b0d10;font-weight:600}
+.mode .sw{
+  position:relative;width:62px;height:38px;border-radius:999px;background:#3a4250;
+  transition:background .2s;flex:0 0 auto;
+}
+.mode .sw::after{
+  content:"";position:absolute;top:3px;left:3px;width:32px;height:32px;border-radius:50%;
+  background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transition:transform .2s;
+}
+.mode.on .sw{background:#ff6b35}
+.mode.on .sw::after{transform:translateX(24px)}
 
 #toast{
   position:fixed;left:50%;transform:translateX(-50%);
@@ -68,7 +76,7 @@ body{
 <div id="app">
   <div class="title">筋トレタイマー</div>
   <div class="grid" id="grid"></div>
-  <button class="mode" id="bench" aria-pressed="false">ベンチプレス</button>
+  <button class="mode" id="bench" role="switch" aria-checked="false"><span>ベンチプレス</span><span class="sw"></span></button>
 </div>
 
 <div id="toast"></div>
@@ -128,7 +136,7 @@ let active = null, loop = null, bench = false;
 $('bench').addEventListener('click', () => {
   bench = !bench;
   $('bench').classList.toggle('on', bench);
-  $('bench').setAttribute('aria-pressed', bench);
+  $('bench').setAttribute('aria-checked', bench);
 });
 
 function start(t){
